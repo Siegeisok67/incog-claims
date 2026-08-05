@@ -21,6 +21,10 @@ claim-sizes:
 earn-interval-minutes: 10
 earn-amount: 10
 
+# Hard cap on how many claim blocks a player can bank (from passive earning or admin grants).
+# Prevents unlimited stockpiling.
+max-claim-blocks: 5000
+
 # Cooldown (days) before a player may switch between PVP and Peaceful.
 switch-cooldown-days: 3
 

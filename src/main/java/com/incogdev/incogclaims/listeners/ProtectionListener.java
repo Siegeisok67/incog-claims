@@ -78,7 +78,7 @@ public class ProtectionListener implements Listener {
                 // Core destroyed -> the claim ceases to exist.
                 plugin.getClaimManager().removeClaim(claim);
                 if (isRaidBreak) {
-                    Msg.send(player, "&c&lRAID SUCCESSFUL! &7You destroyed a claim's core.");
+                    Msg.send(player, "&dYou have broken your claim block.");
                 } else {
                     Msg.send(player, "&eClaim core broken. Your claim has been deleted.");
                 }
@@ -133,8 +133,16 @@ public class ProtectionListener implements Listener {
         if (claim.isMember(player.getUniqueId())) return;
 
         if (event.getBlockPlaced().getType() == Material.TNT) {
+            // PVP claims can be raided by placing/lighting TNT inside them - allowed for
+            // any PVP-flagged player until the claim's core is broken. Peaceful claims
+            // never allow this, from anyone.
+            if (claim.getType() == ClaimType.PVP && isPvpPlayer(player)) {
+                return;
+            }
             event.setCancelled(true);
-            Msg.send(player, "&cYou cannot place TNT inside another player's claim.");
+            Msg.send(player, claim.getType() == ClaimType.PEACEFUL
+                    ? "&cThis is a peaceful claim - TNT cannot be placed here."
+                    : "&cOnly PVP players can place TNT inside this claim.");
             return;
         }
 
@@ -143,9 +151,9 @@ public class ProtectionListener implements Listener {
     }
 
     // ---------------------------------------------------------------
-    // Prevent non-members from lighting existing TNT blocks by hand inside a claim.
-    // Raiding a PVP claim must be done from outside (e.g. TNT cannons), not by
-    // manually igniting TNT while standing inside it.
+    // Lighting existing TNT blocks by hand inside a claim. Peaceful claims never allow
+    // this. PVP claims allow it for any PVP-flagged player (that's how you raid them),
+    // right up until the core is broken and the claim ceases to exist.
     // ---------------------------------------------------------------
     @EventHandler(priority = EventPriority.HIGH)
     public void onTntIgnite(PlayerInteractEvent event) {
@@ -163,8 +171,14 @@ public class ProtectionListener implements Listener {
         if (claim == null) return;
         if (claim.isMember(player.getUniqueId())) return;
 
+        if (claim.getType() == ClaimType.PVP && isPvpPlayer(player)) {
+            return;
+        }
+
         event.setCancelled(true);
-        Msg.send(player, "&cYou cannot light TNT inside another player's claim.");
+        Msg.send(player, claim.getType() == ClaimType.PEACEFUL
+                ? "&cThis is a peaceful claim - TNT cannot be lit here."
+                : "&cOnly PVP players can light TNT inside this claim.");
     }
 
     private void handleCorePlacement(BlockPlaceEvent event, Player player) {

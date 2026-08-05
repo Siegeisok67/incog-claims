@@ -21,6 +21,7 @@ public class ConfigManager {
     private boolean requirePvpAttackerToRaid;
     private boolean opBypass;
     private double claimbreakerLootChance;
+    private int maxClaimBlocks;
 
     public ConfigManager(IncogClaims plugin) {
         this.plugin = plugin;
@@ -58,6 +59,7 @@ public class ConfigManager {
         requirePvpAttackerToRaid = cfg.getBoolean("require-pvp-attacker-to-raid", true);
         opBypass = cfg.getBoolean("op-bypass", true);
         claimbreakerLootChance = cfg.getDouble("claimbreaker-loot-chance", 0.0015);
+        maxClaimBlocks = cfg.getInt("max-claim-blocks", 5000);
     }
 
     public Material getClaimCoreMaterial() { return claimCoreMaterial; }
@@ -70,6 +72,7 @@ public class ConfigManager {
     public boolean isRequirePvpAttackerToRaid() { return requirePvpAttackerToRaid; }
     public boolean isOpBypass() { return opBypass; }
     public double getClaimbreakerLootChance() { return claimbreakerLootChance; }
+    public int getMaxClaimBlocks() { return maxClaimBlocks; }
 
     public String getMessage(String path) {
         return plugin.getConfig().getString("messages." + path, "");

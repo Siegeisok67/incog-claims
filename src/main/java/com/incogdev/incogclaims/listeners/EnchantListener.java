@@ -38,9 +38,9 @@ public class EnchantListener implements Listener {
                         "",
                         "&8Cannot be obtained from villagers."
                 )
-                .glow()
                 .build();
         ItemMeta meta = item.getItemMeta();
+        meta.addEnchant(Enchantment.EFFICIENCY, 5, true);
         meta.getPersistentDataContainer().set(plugin.getClaimBreakerKey(), PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
         return item;
