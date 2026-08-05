@@ -62,23 +62,40 @@ public class ProtectionListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
-        Claim claim = plugin.getClaimManager().getClaimAt(event.getBlock().getLocation());
+        Block block = event.getBlock();
+        Claim claim = plugin.getClaimManager().getClaimAt(block.getLocation());
+
+        boolean isCore = claim != null && claim.isCoreBlock(block.getX(), block.getY(),
+                block.getZ(), block.getWorld().getName());
+        boolean wieldingClaimBreaker = hasClaimBreaker(player.getInventory().getItemInMainHand());
+
+        // The Claim Breaker pickaxe is single-purpose: it can ONLY break claim core
+        // blocks. It's useless against anything else, claimed or not.
+        if (wieldingClaimBreaker && !isCore) {
+            event.setCancelled(true);
+            Msg.send(player, "&cThis is not a claim block; you cannot break non-claimblocks with the Claim Breaker. It's in the name...");
+            return;
+        }
+
         if (claim == null) return;
 
-        boolean isCore = claim.isCoreBlock(event.getBlock().getX(), event.getBlock().getY(),
-                event.getBlock().getZ(), event.getBlock().getWorld().getName());
         boolean isMember = claim.isMember(player.getUniqueId());
         boolean isBypass = bypasses(player);
 
         if (isCore) {
             boolean isRaidBreak = !isMember && !isBypass && claim.getType() == ClaimType.PVP
-                    && hasClaimBreaker(player.getInventory().getItemInMainHand()) && isPvpPlayer(player);
+                    && wieldingClaimBreaker && isPvpPlayer(player);
 
             if (isMember || isBypass || isRaidBreak) {
-                // Core destroyed -> the claim ceases to exist.
+                // Core destroyed -> the claim ceases to exist. Cancel the vanilla break
+                // and delete the claim ourselves so the block just stops existing
+                // (no item drop, no leftover "plain" beacon sitting there).
+                event.setCancelled(true);
                 plugin.getClaimManager().removeClaim(claim);
+
                 if (isRaidBreak) {
-                    Msg.send(player, "&dYou have broken your claim block.");
+                    Msg.send(player, "&a&lRaid Successful! &7You destroyed a player's claim core.");
+                    notifyOwnerOfRaid(claim);
                 } else {
                     Msg.send(player, "&eClaim core broken. Your claim has been deleted.");
                 }
@@ -98,15 +115,18 @@ public class ProtectionListener implements Listener {
             return;
         }
 
-        // PVP claim: normal hand-mining is still blocked unless the raider has the
-        // Claim Breaker pickaxe. Raiding regular blocks is otherwise done via TNT.
-        if (hasClaimBreaker(player.getInventory().getItemInMainHand()) && isPvpPlayer(player)) {
-            Msg.send(player, "&dYou have broken your claim block.");
-            return;
-        }
-
+        // PVP claim, non-core block: hand-mining isn't a thing anymore (the Claim
+        // Breaker only touches cores now) - raiding regular blocks is done via TNT.
         event.setCancelled(true);
         Msg.send(player, "&cYou don't have permission to break blocks in this claim. Try blowing it up.");
+    }
+
+    /** Lets a raided claim's owner know their core was destroyed, without naming the raider. */
+    private void notifyOwnerOfRaid(Claim claim) {
+        Player owner = plugin.getServer().getPlayer(claim.getOwner());
+        if (owner != null) {
+            Msg.send(owner, "&c&lYour claim was raided! &7Your claim core has been destroyed and the claim deleted.");
+        }
     }
 
     // ---------------------------------------------------------------
