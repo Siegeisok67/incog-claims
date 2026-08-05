@@ -1,0 +1,46 @@
+# =========================================================
+#  Incog-Claims v3.11
+#  By Siegeisok67 and the Incog Dev Team
+#  https://github.com/Siegeisok67/incog-claims
+# =========================================================
+
+# The block used as a claim's "core". Right-clicking it (as owner/trusted) opens the claim
+# menu GUI. Breaking it deletes the claim. Give it any material you like - it's just tagged
+# internally with plugin data, it doesn't need to be special vanilla-wise.
+claim-core-material: BEACON
+
+# Available claim sizes (cube, centered on the core block), in blocks.
+# Each size has a claim-block cost the player must have earned to unlock it.
+claim-sizes:
+  48: 0
+  96: 500
+  144: 1200
+  192: 2500
+
+# How often (minutes) online players passively earn claim blocks, and how many they earn.
+earn-interval-minutes: 10
+earn-amount: 10
+
+# Cooldown (days) before a player may switch between PVP and Peaceful.
+switch-cooldown-days: 3
+
+# If true, TNT/explosions are allowed to remove blocks inside PVP claims (raiding).
+# Peaceful claims are ALWAYS fully protected from explosions regardless of this setting.
+tnt-raid-enabled: true
+
+# Only explosions triggered by a player who is themselves flagged PVP can raid PVP claims.
+# If false, any TNT can raid a PVP claim regardless of who lit it.
+require-pvp-attacker-to-raid: true
+
+# OPs / incogclaims.admin holders always bypass claim protection.
+op-bypass: true
+
+# Rare loot-table chance (0.0 - 1.0) for the Claim Breaker pickaxe to appear in generated
+# structure loot (dungeons, ruins, end cities, etc). It is intentionally NOT obtainable
+# from villager trades - a safety-net cancel is also in place for that.
+claimbreaker-loot-chance: 0.0015
+
+messages:
+  prefix: "&8[&5Incog-Claims&8] &r"
+  pvp-warning: "&c&lWARNING: &7You chose &c&lPVP&7. Other PVP players can raid your claim by blowing up its blocks with TNT. Choose wisely!"
+  peaceful-info: "&a&lPeaceful &7chosen. Your claim can never be broken into or raided."

@@ -1,0 +1,22 @@
+name: Incog-Claims
+version: '${project.version}'
+main: com.incogdev.incogclaims.IncogClaims
+api-version: '1.21'
+author: Siegeisok67
+authors: [Siegeisok67, "Incog Dev Team"]
+description: Custom claims plugin with PVP/Peaceful claim types, TNT raiding, and claim cores.
+website: https://github.com/Siegeisok67/incog-claims
+
+commands:
+  iclaims:
+    description: Main Incog-Claims command
+    aliases: [incogclaims]
+    usage: /iclaims [subcommand]
+
+permissions:
+  incogclaims.admin:
+    description: Allows bypassing claim protection and using admin subcommands
+    default: op
+  incogclaims.use:
+    description: Allows using the claims system
+    default: true
