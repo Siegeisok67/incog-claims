@@ -63,9 +63,12 @@ public class IncogClaims extends JavaPlugin {
     private void startEarnTask() {
         long interval = 20L * 60L * Math.max(1, configManager.getEarnIntervalMinutes());
         getServer().getScheduler().runTaskTimer(this, () -> {
+            int cap = configManager.getMaxClaimBlocks();
             for (var player : getServer().getOnlinePlayers()) {
                 if (claimManager.hasClaim(player.getUniqueId())) {
-                    playerDataManager.get(player.getUniqueId()).addClaimBlocks(configManager.getEarnAmount());
+                    var data = playerDataManager.get(player.getUniqueId());
+                    int newAmount = Math.min(cap, data.getClaimBlocks() + configManager.getEarnAmount());
+                    data.setClaimBlocks(newAmount);
                 }
             }
         }, interval, interval);

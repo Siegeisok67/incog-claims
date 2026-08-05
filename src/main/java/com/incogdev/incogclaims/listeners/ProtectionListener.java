@@ -23,9 +23,12 @@ import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.Material;
 
 import java.util.Iterator;
 import java.util.List;
@@ -40,6 +43,10 @@ public class ProtectionListener implements Listener {
     // Tracks which player primed a TNT block, keyed by block location, briefly, so we can
     // tag the resulting PrimedTnt entity with the responsible player's UUID.
     private final Map<String, UUID> pendingPrimers = new ConcurrentHashMap<>();
+
+    // Tracks which claim (by ID) each online player is currently standing inside, so we
+    // only send the "entered a claim" notice once per entry, not every tick.
+    private final Map<UUID, UUID> currentClaim = new ConcurrentHashMap<>();
 
     public ProtectionListener(IncogClaims plugin) {
         this.plugin = plugin;
@@ -94,6 +101,7 @@ public class ProtectionListener implements Listener {
         // PVP claim: normal hand-mining is still blocked unless the raider has the
         // Claim Breaker pickaxe. Raiding regular blocks is otherwise done via TNT.
         if (hasClaimBreaker(player.getInventory().getItemInMainHand()) && isPvpPlayer(player)) {
+            Msg.send(player, "&dYou have broken your claim block.");
             return;
         }
 
@@ -124,8 +132,39 @@ public class ProtectionListener implements Listener {
         if (claim == null) return;
         if (claim.isMember(player.getUniqueId())) return;
 
+        if (event.getBlockPlaced().getType() == Material.TNT) {
+            event.setCancelled(true);
+            Msg.send(player, "&cYou cannot place TNT inside another player's claim.");
+            return;
+        }
+
         event.setCancelled(true);
         Msg.send(player, "&cYou can't place blocks in this claim.");
+    }
+
+    // ---------------------------------------------------------------
+    // Prevent non-members from lighting existing TNT blocks by hand inside a claim.
+    // Raiding a PVP claim must be done from outside (e.g. TNT cannons), not by
+    // manually igniting TNT while standing inside it.
+    // ---------------------------------------------------------------
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onTntIgnite(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        Block block = event.getClickedBlock();
+        if (block == null || block.getType() != Material.TNT) return;
+
+        ItemStack item = event.getItem();
+        if (item == null || (item.getType() != Material.FLINT_AND_STEEL && item.getType() != Material.FIRE_CHARGE)) return;
+
+        Player player = event.getPlayer();
+        if (bypasses(player)) return;
+
+        Claim claim = plugin.getClaimManager().getClaimAt(block.getLocation());
+        if (claim == null) return;
+        if (claim.isMember(player.getUniqueId())) return;
+
+        event.setCancelled(true);
+        Msg.send(player, "&cYou cannot light TNT inside another player's claim.");
     }
 
     private void handleCorePlacement(BlockPlaceEvent event, Player player) {
@@ -306,5 +345,34 @@ public class ProtectionListener implements Listener {
     private boolean isPvpPlayer(Player player) {
         PlayerData data = plugin.getPlayerDataManager().get(player.getUniqueId());
         return data.getType() == ClaimType.PVP;
+    }
+
+    // ---------------------------------------------------------------
+    // Claim enter notification - "You have entered a Peaceful/Aggressive claim (size)".
+    // Never reveals the owner's name or the claim's location.
+    // ---------------------------------------------------------------
+    @EventHandler
+    public void onMove(PlayerMoveEvent event) {
+        if (event.getFrom().getBlockX() == event.getTo().getBlockX()
+                && event.getFrom().getBlockY() == event.getTo().getBlockY()
+                && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
+            return; // only care about actual block-position changes
+        }
+
+        Player player = event.getPlayer();
+        Claim claim = plugin.getClaimManager().getClaimAt(event.getTo());
+        UUID newId = claim == null ? null : claim.getId();
+        UUID oldId = currentClaim.put(player.getUniqueId(), newId);
+
+        if (newId != null && !newId.equals(oldId)) {
+            String typeName = claim.getType() == ClaimType.PVP ? "&c&lAggressive" : "&a&lPeaceful";
+            Msg.actionBar(player, "&7You have entered a " + typeName + "&7 claim &f(" + claim.getSize()
+                    + "x" + claim.getSize() + "x" + claim.getSize() + ")");
+        }
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        currentClaim.remove(event.getPlayer().getUniqueId());
     }
 }

@@ -68,9 +68,11 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
         Msg.sendRaw(sender, "&7/iclaims switch &f- switch PVP/Peaceful (3 day cooldown)");
         Msg.sendRaw(sender, "&7/iclaims info &f- view your claim's info");
         Msg.sendRaw(sender, "&7/iclaims delete &f- delete your claim");
-        if (sender.hasPermission("incogclaims.admin")) {
+        if (sender.isOp()) {
             Msg.sendRaw(sender, "&c/iclaims admin delete <player> &f- delete a player's claim");
             Msg.sendRaw(sender, "&c/iclaims admin give claimbreaker <player> &f- give the rare pickaxe");
+            Msg.sendRaw(sender, "&c/iclaims admin give blocks <player> <amount> &f- give claim blocks");
+            Msg.sendRaw(sender, "&c/iclaims admin removecooldown <player> &f- clear their switch cooldown");
             Msg.sendRaw(sender, "&c/iclaims reload &f- reload config.yml");
         }
         Msg.sendRaw(sender, "&8Made by &5Siegeisok67 &8and the &5Incog Dev Team");
@@ -201,12 +203,12 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleAdmin(CommandSender sender, String[] args) {
-        if (!sender.hasPermission("incogclaims.admin")) {
-            Msg.sendRaw(sender, "&cYou don't have permission.");
+        if (!sender.isOp()) {
+            Msg.sendRaw(sender, "&cOnly server operators can use admin commands.");
             return;
         }
         if (args.length < 2) {
-            Msg.sendRaw(sender, "&cUsage: /iclaims admin <delete|give> ...");
+            Msg.sendRaw(sender, "&cUsage: /iclaims admin <delete|give|removecooldown> ...");
             return;
         }
         String action = args[1].toLowerCase();
@@ -218,22 +220,52 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
             plugin.getClaimManager().removeClaim(claim);
             Msg.sendRaw(sender, "&aDeleted " + args[2] + "'s claim.");
         } else if (action.equals("give")) {
-            if (args.length < 4 || !args[2].equalsIgnoreCase("claimbreaker")) {
-                Msg.sendRaw(sender, "&cUsage: /iclaims admin give claimbreaker <player>");
+            if (args.length < 4) {
+                Msg.sendRaw(sender, "&cUsage: /iclaims admin give <claimbreaker|blocks> <player> [amount]");
                 return;
             }
-            Player target = Bukkit.getPlayer(args[3]);
-            if (target == null) { Msg.sendRaw(sender, "&cPlayer not online."); return; }
-            target.getInventory().addItem(EnchantListener.buildClaimBreakerPickaxe(plugin));
-            Msg.sendRaw(sender, "&aGave " + target.getName() + " a Claim Breaker pickaxe.");
+            String what = args[2].toLowerCase();
+            if (what.equals("claimbreaker")) {
+                Player target = Bukkit.getPlayer(args[3]);
+                if (target == null) { Msg.sendRaw(sender, "&cPlayer not online."); return; }
+                target.getInventory().addItem(EnchantListener.buildClaimBreakerPickaxe(plugin));
+                Msg.sendRaw(sender, "&aGave " + target.getName() + " a Claim Breaker pickaxe.");
+            } else if (what.equals("blocks")) {
+                if (args.length < 5) { Msg.sendRaw(sender, "&cUsage: /iclaims admin give blocks <player> <amount>"); return; }
+                OfflinePlayer target = Bukkit.getOfflinePlayer(args[3]);
+                int amount;
+                try {
+                    amount = Integer.parseInt(args[4]);
+                } catch (NumberFormatException e) {
+                    Msg.sendRaw(sender, "&cAmount must be a number.");
+                    return;
+                }
+                PlayerData data = plugin.getPlayerDataManager().get(target.getUniqueId());
+                int cap = plugin.getConfigManager().getMaxClaimBlocks();
+                data.setClaimBlocks(Math.max(0, Math.min(cap, data.getClaimBlocks() + amount)));
+                Msg.sendRaw(sender, "&aGave " + args[3] + " " + amount + " claim blocks. (Now: " + data.getClaimBlocks() + ")");
+                if (target.isOnline()) {
+                    Msg.send((Player) target, "&aAn admin gave you &f" + amount + " &aclaim blocks.");
+                }
+            } else {
+                Msg.sendRaw(sender, "&cUsage: /iclaims admin give <claimbreaker|blocks> <player> [amount]");
+            }
+        } else if (action.equals("removecooldown")) {
+            if (args.length < 3) { Msg.sendRaw(sender, "&cUsage: /iclaims admin removecooldown <player>"); return; }
+            Player target = Bukkit.getPlayer(args[2]);
+            if (target == null) { Msg.sendRaw(sender, "&cThat player must be online."); return; }
+            PlayerData data = plugin.getPlayerDataManager().get(target.getUniqueId());
+            data.setLastSwitchTimestamp(0L);
+            Msg.sendRaw(sender, "&aCleared " + target.getName() + "'s switch cooldown.");
+            Msg.send(target, "&aAn admin cleared your PVP/Peaceful switch cooldown.");
         } else {
-            Msg.sendRaw(sender, "&cUsage: /iclaims admin <delete|give> ...");
+            Msg.sendRaw(sender, "&cUsage: /iclaims admin <delete|give|removecooldown> ...");
         }
     }
 
     private void handleReload(CommandSender sender) {
-        if (!sender.hasPermission("incogclaims.admin")) {
-            Msg.sendRaw(sender, "&cYou don't have permission.");
+        if (!sender.isOp()) {
+            Msg.sendRaw(sender, "&cOnly server operators can use admin commands.");
             return;
         }
         plugin.getConfigManager().load();
@@ -244,7 +276,7 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> base = new ArrayList<>(List.of("help", "core", "gui", "trust", "untrust",
                 "switch", "info", "delete"));
-        if (sender.hasPermission("incogclaims.admin")) {
+        if (sender.isOp()) {
             base.add("admin");
             base.add("reload");
         }
@@ -256,8 +288,13 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
             return Bukkit.getOnlinePlayers().stream().map(Player::getName)
                     .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase())).collect(Collectors.toList());
         }
-        if (args.length == 2 && args[0].equalsIgnoreCase("admin")) {
-            return List.of("delete", "give").stream().filter(s -> s.startsWith(args[1].toLowerCase())).collect(Collectors.toList());
+        if (args.length == 2 && args[0].equalsIgnoreCase("admin") && sender.isOp()) {
+            return List.of("delete", "give", "removecooldown").stream()
+                    .filter(s -> s.startsWith(args[1].toLowerCase())).collect(Collectors.toList());
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("admin") && args[1].equalsIgnoreCase("give") && sender.isOp()) {
+            return List.of("claimbreaker", "blocks").stream()
+                    .filter(s -> s.startsWith(args[2].toLowerCase())).collect(Collectors.toList());
         }
         return new ArrayList<>();
     }
