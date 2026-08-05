@@ -10,6 +10,7 @@ public class PlayerData {
     private ClaimType type;
     private boolean hasChosenType;
     private long lastSwitchTimestamp; // millis, 0 = never switched
+    private long lastCoreTimestamp; // millis, 0 = never requested a core
     private long firstJoin;
     private int claimBlocks;
 
@@ -18,6 +19,7 @@ public class PlayerData {
         this.type = null;
         this.hasChosenType = false;
         this.lastSwitchTimestamp = 0L;
+        this.lastCoreTimestamp = 0L;
         this.firstJoin = System.currentTimeMillis();
         this.claimBlocks = 0;
     }
@@ -33,6 +35,9 @@ public class PlayerData {
     public long getLastSwitchTimestamp() { return lastSwitchTimestamp; }
     public void setLastSwitchTimestamp(long t) { this.lastSwitchTimestamp = t; }
 
+    public long getLastCoreTimestamp() { return lastCoreTimestamp; }
+    public void setLastCoreTimestamp(long t) { this.lastCoreTimestamp = t; }
+
     public long getFirstJoin() { return firstJoin; }
     public void setFirstJoin(long firstJoin) { this.firstJoin = firstJoin; }
 
@@ -45,6 +50,7 @@ public class PlayerData {
         map.put("type", type == null ? "NONE" : type.name());
         map.put("hasChosenType", hasChosenType);
         map.put("lastSwitchTimestamp", lastSwitchTimestamp);
+        map.put("lastCoreTimestamp", lastCoreTimestamp);
         map.put("firstJoin", firstJoin);
         map.put("claimBlocks", claimBlocks);
         return map;
@@ -58,6 +64,7 @@ public class PlayerData {
         }
         pd.setHasChosenType(Boolean.TRUE.equals(map.get("hasChosenType")));
         pd.setLastSwitchTimestamp(toLong(map.get("lastSwitchTimestamp")));
+        pd.setLastCoreTimestamp(toLong(map.get("lastCoreTimestamp")));
         pd.setFirstJoin(toLong(map.get("firstJoin")));
         Object cb = map.get("claimBlocks");
         pd.setClaimBlocks(cb == null ? 0 : ((Number) cb).intValue());

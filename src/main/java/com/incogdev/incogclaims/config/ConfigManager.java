@@ -17,6 +17,7 @@ public class ConfigManager {
     private int earnIntervalMinutes;
     private int earnAmount;
     private int switchCooldownDays;
+    private int coreCooldownMinutes;
     private boolean tntRaidEnabled;
     private boolean requirePvpAttackerToRaid;
     private boolean opBypass;
@@ -53,9 +54,10 @@ public class ConfigManager {
             claimSizes.put(96, 500);
         }
 
-        earnIntervalMinutes = cfg.getInt("earn-interval-minutes", 10);
-        earnAmount = cfg.getInt("earn-amount", 10);
+        earnIntervalMinutes = cfg.getInt("earn-interval-minutes", 5);
+        earnAmount = cfg.getInt("earn-amount", 25);
         switchCooldownDays = cfg.getInt("switch-cooldown-days", 3);
+        coreCooldownMinutes = cfg.getInt("core-cooldown-minutes", 30);
         tntRaidEnabled = cfg.getBoolean("tnt-raid-enabled", true);
         requirePvpAttackerToRaid = cfg.getBoolean("require-pvp-attacker-to-raid", true);
         opBypass = cfg.getBoolean("op-bypass", true);
@@ -70,6 +72,7 @@ public class ConfigManager {
     public int getEarnIntervalMinutes() { return earnIntervalMinutes; }
     public int getEarnAmount() { return earnAmount; }
     public int getSwitchCooldownDays() { return switchCooldownDays; }
+    public int getCoreCooldownMinutes() { return coreCooldownMinutes; }
     public boolean isTntRaidEnabled() { return tntRaidEnabled; }
     public boolean isRequirePvpAttackerToRaid() { return requirePvpAttackerToRaid; }
     public boolean isOpBypass() { return opBypass; }

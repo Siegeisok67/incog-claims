@@ -54,17 +54,18 @@ public class EnchantListener implements Listener {
      * Registers the Claim Breaker's crafting recipe:
      *   N N N   (N = Netherite Ingot)
      *   D P D   (D = Diamond, P = Netherite Pickaxe)
-     *     T     (T = Totem of Undying)
+     *   C T C   (C = Copper Ingot, T = Totem of Undying)
      */
     public static void registerRecipe(IncogClaims plugin) {
         if (!plugin.getConfigManager().isClaimbreakerCraftable()) return;
 
         NamespacedKey key = new NamespacedKey(plugin, "claim_breaker");
         ShapedRecipe recipe = new ShapedRecipe(key, buildClaimBreakerPickaxe(plugin));
-        recipe.shape("NNN", "DPD", " T ");
+        recipe.shape("NNN", "DPD", "CTC");
         recipe.setIngredient('N', Material.NETHERITE_INGOT);
         recipe.setIngredient('D', Material.DIAMOND);
         recipe.setIngredient('P', Material.NETHERITE_PICKAXE);
+        recipe.setIngredient('C', Material.COPPER_INGOT);
         recipe.setIngredient('T', Material.TOTEM_OF_UNDYING);
 
         plugin.getServer().addRecipe(recipe);
