@@ -61,7 +61,7 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(CommandSender sender) {
         Msg.sendRaw(sender, "&8&m----------&r &5&lIncog-Claims v3.11 &8&m----------");
-        Msg.sendRaw(sender, "&7/iclaims core &f- get a claim core to place");
+        Msg.sendRaw(sender, "&7/iclaims core &f- get a claim core to place (30 min cooldown)");
         Msg.sendRaw(sender, "&7/iclaims gui &f- open your claim menu");
         Msg.sendRaw(sender, "&7/iclaims trust <player> &f- allow a player to build/break");
         Msg.sendRaw(sender, "&7/iclaims untrust <player> &f- remove trust");
@@ -89,6 +89,18 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
             Msg.send(player, "&cYou already own a claim.");
             return;
         }
+
+        long cooldownMillis = TimeUnit.MINUTES.toMillis(plugin.getConfigManager().getCoreCooldownMinutes());
+        long since = System.currentTimeMillis() - data.getLastCoreTimestamp();
+        if (data.getLastCoreTimestamp() != 0 && since < cooldownMillis) {
+            long remaining = cooldownMillis - since;
+            long minutes = TimeUnit.MILLISECONDS.toMinutes(remaining);
+            long seconds = TimeUnit.MILLISECONDS.toSeconds(remaining) % 60;
+            Msg.send(player, "&cYou can request another claim core in " + minutes + "m " + seconds + "s.");
+            return;
+        }
+
+        data.setLastCoreTimestamp(System.currentTimeMillis());
         ItemStack core = buildCoreItem();
         player.getInventory().addItem(core);
         Msg.send(player, "&aClaim core given! Place it to create your claim (centered on that block).");
@@ -138,6 +150,19 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (trust) {
+            ClaimType targetType = plugin.getPlayerDataManager().get(target.getUniqueId()).getType();
+            if (targetType == null) {
+                Msg.send(player, "&cThat player hasn't chosen Peaceful or PVP yet, so they can't be trusted.");
+                return;
+            }
+            if (targetType != claim.getType()) {
+                if (claim.getType() == ClaimType.PEACEFUL) {
+                    Msg.send(player, "&cYour claim is Peaceful - you can only trust other Peaceful players.");
+                } else {
+                    Msg.send(player, "&cYour claim is PVP - you can only trust other PVP players.");
+                }
+                return;
+            }
             claim.getTrusted().add(target.getUniqueId());
             Msg.send(player, "&aTrusted " + args[1] + ". They can now build/break in your claim.");
         } else {
@@ -169,7 +194,15 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
         data.setLastSwitchTimestamp(System.currentTimeMillis());
 
         Claim claim = plugin.getClaimManager().getClaimByOwner(player.getUniqueId());
-        if (claim != null) claim.setType(newType);
+        if (claim != null) {
+            claim.setType(newType);
+            // Keep the "peaceful can only trust peaceful / PVP can only trust PVP" rule
+            // consistent - drop any trusted player who no longer matches after the switch.
+            claim.getTrusted().removeIf(uuid -> {
+                ClaimType trustedType = plugin.getPlayerDataManager().get(uuid).getType();
+                return trustedType != newType;
+            });
+        }
 
         Msg.send(player, "&aYou are now &f" + newType.name() + "&a.");
         if (newType == ClaimType.PVP) {
@@ -256,8 +289,9 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
             if (target == null) { Msg.sendRaw(sender, "&cThat player must be online."); return; }
             PlayerData data = plugin.getPlayerDataManager().get(target.getUniqueId());
             data.setLastSwitchTimestamp(0L);
-            Msg.sendRaw(sender, "&aCleared " + target.getName() + "'s switch cooldown.");
-            Msg.send(target, "&aAn admin cleared your PVP/Peaceful switch cooldown.");
+            data.setLastCoreTimestamp(0L);
+            Msg.sendRaw(sender, "&aCleared " + target.getName() + "'s switch and claim core cooldowns.");
+            Msg.send(target, "&aAn admin cleared your PVP/Peaceful switch and claim core cooldowns.");
         } else {
             Msg.sendRaw(sender, "&cUsage: /iclaims admin <delete|give|removecooldown> ...");
         }

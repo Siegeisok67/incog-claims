@@ -1,6 +1,9 @@
 package com.incogdev.incogclaims.data;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.World;
 
 import java.util.*;
 
@@ -30,9 +33,22 @@ public class ClaimManager {
         claimsByOwner.put(claim.getOwner(), claim);
     }
 
+    /**
+     * Deletes a claim entirely: removes it from the data maps AND makes sure its core
+     * block actually stops existing in the world. Previously the core block (e.g. the
+     * beacon) was left behind as a plain, unprotected block after deletion - now it's
+     * cleared to air so nothing lingers.
+     */
     public void removeClaim(Claim claim) {
         claimsById.remove(claim.getId());
         claimsByOwner.remove(claim.getOwner());
+        clearCoreBlock(claim);
+    }
+
+    private void clearCoreBlock(Claim claim) {
+        World world = Bukkit.getWorld(claim.getWorldName());
+        if (world == null) return;
+        world.getBlockAt(claim.getCoreX(), claim.getCoreY(), claim.getCoreZ()).setType(Material.AIR, false);
     }
 
     /** Finds the claim (if any) that contains the given location. */

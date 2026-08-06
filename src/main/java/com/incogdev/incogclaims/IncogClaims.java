@@ -43,6 +43,7 @@ public class IncogClaims extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(new GUIListener(this), this);
         getServer().getPluginManager().registerEvents(new EnchantListener(this), this);
+        EnchantListener.registerRecipe(this);
 
         IClaimsCommand command = new IClaimsCommand(this);
         getCommand("iclaims").setExecutor(command);

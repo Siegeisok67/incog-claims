@@ -17,9 +17,10 @@ claim-sizes:
   144: 1200
   192: 2500
 
-# How often (minutes) online players passively earn claim blocks, and how many they earn.
-earn-interval-minutes: 10
-earn-amount: 10
+# How often (minutes) online players passively earn claim blocks, and how many they earn
+# per interval. Default below works out to 5 claim blocks per minute (5 min x 5/min = 25).
+earn-interval-minutes: 5
+earn-amount: 25
 
 # Hard cap on how many claim blocks a player can bank (from passive earning or admin grants).
 # Prevents unlimited stockpiling.
@@ -27,6 +28,10 @@ max-claim-blocks: 5000
 
 # Cooldown (days) before a player may switch between PVP and Peaceful.
 switch-cooldown-days: 3
+
+# Cooldown (minutes) before a player can request another Claim Core with /iclaims core.
+# Only applies to getting a NEW core item - it does not affect an already-placed claim.
+core-cooldown-minutes: 30
 
 # If true, TNT/explosions are allowed to remove blocks inside PVP claims (raiding).
 # Peaceful claims are ALWAYS fully protected from explosions regardless of this setting.
@@ -43,6 +48,12 @@ op-bypass: true
 # structure loot (dungeons, ruins, end cities, etc). It is intentionally NOT obtainable
 # from villager trades - a safety-net cancel is also in place for that.
 claimbreaker-loot-chance: 0.0015
+
+# If true, the Claim Breaker pickaxe can also be crafted directly:
+#   [Netherite Ingot]   [Netherite Ingot]   [Netherite Ingot]
+#   [Diamond]           [Netherite Pickaxe] [Diamond]
+#   [Copper Ingot]      [Totem of Undying]  [Copper Ingot]
+claimbreaker-craftable: true
 
 messages:
   prefix: "&8[&5Incog-Claims&8] &r"
