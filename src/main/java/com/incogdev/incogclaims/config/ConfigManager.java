@@ -18,6 +18,10 @@ public class ConfigManager {
     private int earnAmount;
     private int switchCooldownDays;
     private int coreCooldownMinutes;
+    private int maxObsidianPerClaim;
+    private int maxBedrockPerClaim;
+    private int extraClaimCostBlocks;
+    private int extraClaimCostEndCrystals;
     private boolean tntRaidEnabled;
     private boolean requirePvpAttackerToRaid;
     private boolean opBypass;
@@ -58,6 +62,10 @@ public class ConfigManager {
         earnAmount = cfg.getInt("earn-amount", 25);
         switchCooldownDays = cfg.getInt("switch-cooldown-days", 3);
         coreCooldownMinutes = cfg.getInt("core-cooldown-minutes", 30);
+        maxObsidianPerClaim = cfg.getInt("max-obsidian-per-claim", 120);
+        maxBedrockPerClaim = cfg.getInt("max-bedrock-per-claim", 0);
+        extraClaimCostBlocks = cfg.getInt("extra-claim-cost-blocks", 500);
+        extraClaimCostEndCrystals = cfg.getInt("extra-claim-cost-end-crystals", 5);
         tntRaidEnabled = cfg.getBoolean("tnt-raid-enabled", true);
         requirePvpAttackerToRaid = cfg.getBoolean("require-pvp-attacker-to-raid", true);
         opBypass = cfg.getBoolean("op-bypass", true);
@@ -73,6 +81,10 @@ public class ConfigManager {
     public int getEarnAmount() { return earnAmount; }
     public int getSwitchCooldownDays() { return switchCooldownDays; }
     public int getCoreCooldownMinutes() { return coreCooldownMinutes; }
+    public int getMaxObsidianPerClaim() { return maxObsidianPerClaim; }
+    public int getMaxBedrockPerClaim() { return maxBedrockPerClaim; }
+    public int getExtraClaimCostBlocks() { return extraClaimCostBlocks; }
+    public int getExtraClaimCostEndCrystals() { return extraClaimCostEndCrystals; }
     public boolean isTntRaidEnabled() { return tntRaidEnabled; }
     public boolean isRequirePvpAttackerToRaid() { return requirePvpAttackerToRaid; }
     public boolean isOpBypass() { return opBypass; }

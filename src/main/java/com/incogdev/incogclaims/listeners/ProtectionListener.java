@@ -30,9 +30,11 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.Material;
 
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -48,8 +50,79 @@ public class ProtectionListener implements Listener {
     // only send the "entered a claim" notice once per entry, not every tick.
     private final Map<UUID, UUID> currentClaim = new ConcurrentHashMap<>();
 
+    // Guards against log/TPS spam: if onMove ever throws, we log it once instead of every tick.
+    private volatile boolean loggedMoveError = false;
+
+    // Players who've toggled /iclaims showclaim on - they see a particle border around
+    // every claim they own, redrawn once a second by tickBorders().
+    private final Set<UUID> showingBorder = ConcurrentHashMap.newKeySet();
+
     public ProtectionListener(IncogClaims plugin) {
         this.plugin = plugin;
+    }
+
+    /** Toggles the claim-border particle display for this player. Returns the new state. */
+    public boolean toggleShowClaim(UUID uuid) {
+        if (showingBorder.remove(uuid)) return false;
+        showingBorder.add(uuid);
+        return true;
+    }
+
+    /**
+     * Redraws a particle wireframe (green "happy villager" sparkles, same as trading with
+     * villagers) around every claim each toggled-on player owns. Only draws claims in the
+     * player's current world within a reasonable distance, to avoid wasted work for claims
+     * they're nowhere near. Particles are sent only to that one player.
+     */
+    public void tickBorders() {
+        if (showingBorder.isEmpty()) return;
+        final int maxRenderDistance = 150;
+
+        for (UUID uuid : showingBorder) {
+            Player player = plugin.getServer().getPlayer(uuid);
+            if (player == null || !player.isOnline()) continue;
+
+            for (Claim claim : plugin.getClaimManager().getClaimsOwnedBy(uuid)) {
+                if (!claim.getWorldName().equals(player.getWorld().getName())) continue;
+                Location core = claim.getCoreLocation();
+                if (core == null) continue;
+                if (core.distance(player.getLocation()) > maxRenderDistance + claim.getHalf()) continue;
+                drawClaimBorder(player, claim);
+            }
+        }
+    }
+
+    private void drawClaimBorder(Player player, Claim claim) {
+        org.bukkit.World world = player.getWorld();
+        int half = claim.getHalf();
+        int minX = claim.getCoreX() - half, maxX = claim.getCoreX() + half;
+        int minY = claim.getCoreY() - half, maxY = claim.getCoreY() + half;
+        int minZ = claim.getCoreZ() - half, maxZ = claim.getCoreZ() + half;
+        int step = 2; // particle spacing - keeps big claims from spamming thousands of particles
+
+        for (int y = minY; y <= maxY; y += step) {
+            spawnBorderParticle(player, world, minX, y, minZ);
+            spawnBorderParticle(player, world, minX, y, maxZ);
+            spawnBorderParticle(player, world, maxX, y, minZ);
+            spawnBorderParticle(player, world, maxX, y, maxZ);
+        }
+        for (int x = minX; x <= maxX; x += step) {
+            spawnBorderParticle(player, world, x, minY, minZ);
+            spawnBorderParticle(player, world, x, minY, maxZ);
+            spawnBorderParticle(player, world, x, maxY, minZ);
+            spawnBorderParticle(player, world, x, maxY, maxZ);
+        }
+        for (int z = minZ; z <= maxZ; z += step) {
+            spawnBorderParticle(player, world, minX, minY, z);
+            spawnBorderParticle(player, world, maxX, minY, z);
+            spawnBorderParticle(player, world, minX, maxY, z);
+            spawnBorderParticle(player, world, maxX, maxY, z);
+        }
+    }
+
+    private void spawnBorderParticle(Player player, org.bukkit.World world, int x, int y, int z) {
+        player.spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER,
+                x + 0.5, y + 0.5, z + 0.5, 1, 0, 0, 0, 0);
     }
 
     private boolean bypasses(Player player) {
@@ -69,9 +142,24 @@ public class ProtectionListener implements Listener {
                 block.getZ(), block.getWorld().getName());
         boolean wieldingClaimBreaker = hasClaimBreaker(player.getInventory().getItemInMainHand());
 
-        // The Claim Breaker pickaxe is single-purpose: it can ONLY break claim core
-        // blocks. It's useless against anything else, claimed or not.
+        // The Claim Breaker's job is breaking claim cores. It's ALSO the only thing that
+        // can break TNT-immune blocks (obsidian, ancient debris, etc.) - people wall
+        // those in as raid-proofing, so the tool needs to be able to clear them. Bedrock
+        // is never breakable, no exceptions.
         if (wieldingClaimBreaker && !isCore) {
+            if (isTntImmune(block.getType())) {
+                // Even with the Claim Breaker, a Peaceful claim's protection is absolute.
+                boolean memberOrBypass = claim != null
+                        && (claim.isMember(player.getUniqueId()) || bypasses(player));
+                if (claim != null && claim.getType() == ClaimType.PEACEFUL && !memberOrBypass) {
+                    event.setCancelled(true);
+                    Msg.send(player, "&cThis is a peaceful claim - it cannot be broken into.");
+                    return;
+                }
+                if (claim != null && block.getType() == Material.OBSIDIAN) claim.decrementObsidian();
+                if (claim != null && block.getType() == Material.BEDROCK) claim.decrementBedrock();
+                return; // allowed - vanilla break proceeds
+            }
             event.setCancelled(true);
             Msg.send(player, "&cThis is not a claim block; you cannot break non-claimblocks with the Claim Breaker. It's in the name...");
             return;
@@ -107,7 +195,11 @@ public class ProtectionListener implements Listener {
             return;
         }
 
-        if (isMember || isBypass) return;
+        if (isMember || isBypass) {
+            if (block.getType() == Material.OBSIDIAN) claim.decrementObsidian();
+            if (block.getType() == Material.BEDROCK) claim.decrementBedrock();
+            return;
+        }
 
         if (claim.getType() == ClaimType.PEACEFUL) {
             event.setCancelled(true);
@@ -140,9 +232,15 @@ public class ProtectionListener implements Listener {
         ItemMeta meta = inHand.getItemMeta();
         boolean isCoreItem = meta != null && meta.getPersistentDataContainer()
                 .has(plugin.getCoreBlockKey(), PersistentDataType.STRING);
+        boolean isExtraCoreItem = meta != null && meta.getPersistentDataContainer()
+                .has(plugin.getExtraCoreBlockKey(), PersistentDataType.STRING);
 
         if (isCoreItem) {
             handleCorePlacement(event, player);
+            return;
+        }
+        if (isExtraCoreItem) {
+            handleExtraCorePlacement(event, player);
             return;
         }
 
@@ -150,9 +248,34 @@ public class ProtectionListener implements Listener {
 
         Claim claim = plugin.getClaimManager().getClaimAt(event.getBlockPlaced().getLocation());
         if (claim == null) return;
-        if (claim.isMember(player.getUniqueId())) return;
 
-        if (event.getBlockPlaced().getType() == Material.TNT) {
+        Material placedType = event.getBlockPlaced().getType();
+
+        if (claim.isMember(player.getUniqueId())) {
+            if (placedType == Material.OBSIDIAN) {
+                int max = plugin.getConfigManager().getMaxObsidianPerClaim();
+                if (max > 0 && claim.getObsidianCount() >= max) {
+                    event.setCancelled(true);
+                    Msg.send(player, "&cThis claim already has the max of " + max + " obsidian blocks.");
+                    return;
+                }
+                claim.incrementObsidian();
+            }
+            if (placedType == Material.BEDROCK) {
+                int max = plugin.getConfigManager().getMaxBedrockPerClaim();
+                if (claim.getBedrockCount() >= max) {
+                    event.setCancelled(true);
+                    Msg.send(player, max <= 0
+                            ? "&cBedrock can't be placed inside a claim."
+                            : "&cThis claim already has the max of " + max + " bedrock blocks.");
+                    return;
+                }
+                claim.incrementBedrock();
+            }
+            return;
+        }
+
+        if (placedType == Material.TNT) {
             // PVP claims can be raided by placing/lighting TNT inside them - allowed for
             // any PVP-flagged player until the claim's core is broken. Peaceful claims
             // never allow this, from anyone.
@@ -228,6 +351,33 @@ public class ProtectionListener implements Listener {
         Claim claim = new Claim(UUID.randomUUID(), player.getUniqueId(), data.getType(), loc, size);
         plugin.getClaimManager().addClaim(claim);
         Msg.send(player, "&aClaim created! Size: " + size + "x" + size + "x" + size
+                + ". Right-click the core block to manage it.");
+    }
+
+    /** Places an "extra" (purchased) claim core - same overlap rules, but never inherits
+     *  another claim's size and is tracked separately from your primary claim. */
+    private void handleExtraCorePlacement(BlockPlaceEvent event, Player player) {
+        PlayerData data = plugin.getPlayerDataManager().get(player.getUniqueId());
+        if (data.getType() == null) {
+            event.setCancelled(true);
+            Msg.send(player, "&cYou must choose Peaceful or PVP before placing a claim core.");
+            return;
+        }
+
+        int size = plugin.getConfigManager().getSmallestSize();
+        Location loc = event.getBlockPlaced().getLocation();
+        boolean overlaps = plugin.getClaimManager().wouldOverlap(null, loc.getWorld().getName(),
+                loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), size);
+        if (overlaps) {
+            event.setCancelled(true);
+            Msg.send(player, "&cToo close to another claim.");
+            return;
+        }
+
+        Claim claim = new Claim(UUID.randomUUID(), player.getUniqueId(), data.getType(), loc, size);
+        claim.setPrimary(false);
+        plugin.getClaimManager().addClaim(claim);
+        Msg.send(player, "&aExtra claim created! Size: " + size + "x" + size + "x" + size
                 + ". Right-click the core block to manage it.");
     }
 
@@ -317,6 +467,21 @@ public class ProtectionListener implements Listener {
         }
     }
 
+    // End crystals are a valid raiding method too (crystal PvP style base-breaking) -
+    // whoever detonates one (melee or projectile) is tagged as the "primer", the exact
+    // same way TNT is, so onExplode below treats it identically. This also means it
+    // naturally works when the crystal is detonated from outside the claim - onExplode
+    // checks each affected block's claim membership individually, not the crystal's
+    // location.
+    @EventHandler
+    public void onCrystalDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof org.bukkit.entity.EnderCrystal crystal)) return;
+        Player attacker = resolvePlayerAttacker(event.getDamager());
+        if (attacker == null) return;
+        crystal.setMetadata("incogclaims_primer",
+                new org.bukkit.metadata.FixedMetadataValue(plugin, attacker.getUniqueId().toString()));
+    }
+
     private String locKey(Location loc) {
         return loc.getWorld().getName() + ":" + loc.getBlockX() + ":" + loc.getBlockY() + ":" + loc.getBlockZ();
     }
@@ -362,8 +527,10 @@ public class ProtectionListener implements Listener {
             }
             if (plugin.getConfigManager().isRequirePvpAttackerToRaid() && !primerIsPvp) {
                 it.remove();
+                continue;
             }
             // else: allowed to blow up - raid succeeds
+            if (b.getType() == Material.OBSIDIAN) claim.decrementObsidian();
         }
     }
 
@@ -381,27 +548,60 @@ public class ProtectionListener implements Listener {
         return data.getType() == ClaimType.PVP;
     }
 
+    // Blocks that survive a standard TNT explosion in vanilla. Bedrock is deliberately
+    // excluded - the Claim Breaker must never be able to touch it.
+    private static final Set<Material> TNT_IMMUNE = EnumSet.of(
+            Material.OBSIDIAN,
+            Material.CRYING_OBSIDIAN,
+            Material.ANCIENT_DEBRIS,
+            Material.NETHERITE_BLOCK,
+            Material.RESPAWN_ANCHOR,
+            Material.REINFORCED_DEEPSLATE,
+            Material.ENCHANTING_TABLE
+    );
+
+    private boolean isTntImmune(Material type) {
+        if (type == Material.BEDROCK) return false;
+        return TNT_IMMUNE.contains(type);
+    }
+
     // ---------------------------------------------------------------
     // Claim enter notification - "You have entered a Peaceful/Aggressive claim (size)".
     // Never reveals the owner's name or the claim's location.
     // ---------------------------------------------------------------
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
-        if (event.getFrom().getBlockX() == event.getTo().getBlockX()
-                && event.getFrom().getBlockY() == event.getTo().getBlockY()
-                && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
-            return; // only care about actual block-position changes
-        }
+        try {
+            // PlayerMoveEvent#getTo() can be null (some teleport edge cases) - this was
+            // almost certainly the actual cause of the "Could not pass event
+            // PlayerMoveEvent" log spam and TPS drop, since an NPE here fires on every
+            // single move for every player.
+            Location to = event.getTo();
+            Location from = event.getFrom();
+            if (to == null || to.getWorld() == null || from == null) return;
 
-        Player player = event.getPlayer();
-        Claim claim = plugin.getClaimManager().getClaimAt(event.getTo());
-        UUID newId = claim == null ? null : claim.getId();
-        UUID oldId = currentClaim.put(player.getUniqueId(), newId);
+            if (from.getBlockX() == to.getBlockX()
+                    && from.getBlockY() == to.getBlockY()
+                    && from.getBlockZ() == to.getBlockZ()) {
+                return; // only care about actual block-position changes
+            }
 
-        if (newId != null && !newId.equals(oldId)) {
-            String typeName = claim.getType() == ClaimType.PVP ? "&c&lAggressive" : "&a&lPeaceful";
-            Msg.actionBar(player, "&7You have entered a " + typeName + "&7 claim &f(" + claim.getSize()
-                    + "x" + claim.getSize() + "x" + claim.getSize() + ")");
+            Player player = event.getPlayer();
+            Claim claim = plugin.getClaimManager().getClaimAt(to);
+            UUID newId = claim == null ? null : claim.getId();
+            UUID oldId = currentClaim.put(player.getUniqueId(), newId);
+
+            if (newId != null && !newId.equals(oldId)) {
+                String typeName = claim.getType() == ClaimType.PVP ? "&c&lAggressive" : "&a&lPeaceful";
+                Msg.actionBar(player, "&7You have entered a " + typeName + "&7 claim &f(" + claim.getSize()
+                        + "x" + claim.getSize() + "x" + claim.getSize() + ")");
+            }
+        } catch (Exception e) {
+            // Never let this handler spam the console/TPS - log once, then stay quiet.
+            if (!loggedMoveError) {
+                loggedMoveError = true;
+                plugin.getLogger().warning("Incog-Claims: suppressing repeated errors in claim-enter tracking: " + e);
+            }
         }
     }
 

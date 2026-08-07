@@ -22,13 +22,16 @@ public class IncogClaims extends JavaPlugin {
     private StorageManager storageManager;
 
     private NamespacedKey coreBlockKey;
+    private NamespacedKey extraCoreBlockKey;
     private NamespacedKey claimBreakerKey;
+    private ProtectionListener protectionListener;
 
     @Override
     public void onEnable() {
         instance = this;
 
         this.coreBlockKey = new NamespacedKey(this, "claim_core");
+        this.extraCoreBlockKey = new NamespacedKey(this, "extra_claim_core");
         this.claimBreakerKey = new NamespacedKey(this, "claim_breaker");
 
         this.configManager = new ConfigManager(this);
@@ -40,7 +43,8 @@ public class IncogClaims extends JavaPlugin {
         this.storageManager.loadAll();
 
         getServer().getPluginManager().registerEvents(new JoinListener(this), this);
-        getServer().getPluginManager().registerEvents(new ProtectionListener(this), this);
+        this.protectionListener = new ProtectionListener(this);
+        getServer().getPluginManager().registerEvents(protectionListener, this);
         getServer().getPluginManager().registerEvents(new GUIListener(this), this);
         getServer().getPluginManager().registerEvents(new EnchantListener(this), this);
         EnchantListener.registerRecipe(this);
@@ -51,6 +55,7 @@ public class IncogClaims extends JavaPlugin {
 
         startEarnTask();
         startAutosaveTask();
+        startBorderTask();
 
         getLogger().info("Incog-Claims v" + getDescription().getVersion() + " enabled. By Siegeisok67 and the Incog Dev Team.");
     }
@@ -80,6 +85,13 @@ public class IncogClaims extends JavaPlugin {
         getServer().getScheduler().runTaskTimerAsynchronously(this, () -> storageManager.saveAll(), interval, interval);
     }
 
+    private void startBorderTask() {
+        // Redraws claim-border particles for anyone with /iclaims showclaim toggled on.
+        // Runs on the main thread (particle spawning is not thread-safe) every second -
+        // frequent enough to look like a steady outline without spamming packets.
+        getServer().getScheduler().runTaskTimer(this, protectionListener::tickBorders, 20L, 20L);
+    }
+
     public static IncogClaims getInstance() { return instance; }
 
     public ConfigManager getConfigManager() { return configManager; }
@@ -87,5 +99,7 @@ public class IncogClaims extends JavaPlugin {
     public PlayerDataManager getPlayerDataManager() { return playerDataManager; }
     public StorageManager getStorageManager() { return storageManager; }
     public NamespacedKey getCoreBlockKey() { return coreBlockKey; }
+    public NamespacedKey getExtraCoreBlockKey() { return extraCoreBlockKey; }
     public NamespacedKey getClaimBreakerKey() { return claimBreakerKey; }
+    public ProtectionListener getProtectionListener() { return protectionListener; }
 }

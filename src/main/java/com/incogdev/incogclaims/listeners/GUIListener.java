@@ -96,7 +96,7 @@ public class GUIListener implements Listener {
             }
 
             ownerData.addClaimBlocks(-cost);
-            claim.setSize(size);
+            plugin.getClaimManager().resizeClaim(claim, size);
             Msg.send(player, "&aClaim resized to &f" + size + "x" + size + "x" + size + "&a!");
             player.closeInventory();
         }

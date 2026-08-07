@@ -39,7 +39,8 @@ public class EnchantListener implements Listener {
                         "&dPVP player's claim core, ending",
                         "&dtheir claim for good.",
                         "",
-                        "&8Only breaks claim cores - nothing else.",
+                        "&8Only breaks claim cores and TNT-immune",
+                        "&8blocks (obsidian, etc). Not bedrock.",
                         "&8Cannot be obtained from villagers."
                 )
                 .build();

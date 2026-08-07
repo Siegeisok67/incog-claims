@@ -33,6 +33,21 @@ switch-cooldown-days: 3
 # Only applies to getting a NEW core item - it does not affect an already-placed claim.
 core-cooldown-minutes: 30
 
+# Max obsidian blocks allowed inside a single claim (stops players obsidian-boxing their
+# claim to make it unraidable). 0 = no limit.
+max-obsidian-per-claim: 120
+
+# Max bedrock blocks allowed inside a single claim. Bedrock isn't normally survival-
+# obtainable, but if your server grants it some other way, this stops it being used to
+# wall off a claim completely. Default 0 = bedrock can't be placed in a claim at all.
+max-bedrock-per-claim: 0
+
+# Cost to buy an additional claim beyond your first free one, via /iclaims buy.
+# The new claim always starts at the smallest size - it does NOT inherit any expansion
+# size from your other claim(s).
+extra-claim-cost-blocks: 500
+extra-claim-cost-end-crystals: 5
+
 # If true, TNT/explosions are allowed to remove blocks inside PVP claims (raiding).
 # Peaceful claims are ALWAYS fully protected from explosions regardless of this setting.
 tnt-raid-enabled: true

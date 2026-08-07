@@ -20,6 +20,9 @@ public class Claim {
     private int coreX, coreY, coreZ;
     private int size; // cube edge length, centered on core
     private final Set<UUID> trusted = new HashSet<>();
+    private boolean primary = true; // false for purchased "extra" claims
+    private int obsidianCount = 0;   // live count of obsidian blocks placed inside this claim
+    private int bedrockCount = 0;    // live count of bedrock blocks placed inside this claim
 
     public Claim(UUID id, UUID owner, ClaimType type, Location core, int size) {
         this.id = id;
@@ -39,6 +42,17 @@ public class Claim {
     public int getSize() { return size; }
     public void setSize(int size) { this.size = size; }
     public Set<UUID> getTrusted() { return trusted; }
+
+    public boolean isPrimary() { return primary; }
+    public void setPrimary(boolean primary) { this.primary = primary; }
+
+    public int getObsidianCount() { return obsidianCount; }
+    public void incrementObsidian() { obsidianCount++; }
+    public void decrementObsidian() { if (obsidianCount > 0) obsidianCount--; }
+
+    public int getBedrockCount() { return bedrockCount; }
+    public void incrementBedrock() { bedrockCount++; }
+    public void decrementBedrock() { if (bedrockCount > 0) bedrockCount--; }
 
     public String getWorldName() { return world; }
     public int getCoreX() { return coreX; }
@@ -94,6 +108,9 @@ public class Claim {
         map.put("coreZ", coreZ);
         map.put("size", size);
         map.put("trusted", trusted.stream().map(UUID::toString).collect(Collectors.toList()));
+        map.put("primary", primary);
+        map.put("obsidianCount", obsidianCount);
+        map.put("bedrockCount", bedrockCount);
         return map;
     }
 
@@ -116,6 +133,18 @@ public class Claim {
             for (Object o : (Iterable<Object>) trustedObj) {
                 try { claim.getTrusted().add(UUID.fromString(o.toString())); } catch (Exception ignored) {}
             }
+        }
+        // Missing "primary" (claims saved before this field existed) defaults to true,
+        // so nobody's existing claim silently turns into an untracked "extra" claim.
+        Object primaryObj = map.get("primary");
+        claim.setPrimary(primaryObj == null || Boolean.parseBoolean(primaryObj.toString()));
+        Object obsidianObj = map.get("obsidianCount");
+        if (obsidianObj instanceof Number) {
+            for (int i = 0; i < ((Number) obsidianObj).intValue(); i++) claim.incrementObsidian();
+        }
+        Object bedrockObj = map.get("bedrockCount");
+        if (bedrockObj instanceof Number) {
+            for (int i = 0; i < ((Number) bedrockObj).intValue(); i++) claim.incrementBedrock();
         }
         return claim;
     }
