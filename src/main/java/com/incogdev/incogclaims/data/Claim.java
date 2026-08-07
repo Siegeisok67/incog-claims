@@ -87,6 +87,28 @@ public class Claim {
                 && y >= coreY - half && y <= coreY + half;
     }
 
+    /**
+     * True if loc is within `padding` blocks of this claim's horizontal (X/Z) footprint,
+     * but NOT inside that footprint - i.e. the "keep clear" ring just outside the claim's
+     * border. Deliberately ignores Y entirely (unlike contains()/overlapsCube()) since the
+     * obsidian-box exploit this guards against works at any height, not just level with
+     * the claim.
+     */
+    public boolean isInHorizontalBuffer(Location loc, int padding) {
+        if (loc.getWorld() == null || !loc.getWorld().getName().equals(world)) return false;
+        int half = getHalf();
+        int x = loc.getBlockX(), z = loc.getBlockZ();
+
+        int extended = half + padding;
+        boolean withinExtended = x >= coreX - extended && x <= coreX + extended
+                && z >= coreZ - extended && z <= coreZ + extended;
+        if (!withinExtended) return false;
+
+        boolean insideFootprint = x >= coreX - half && x <= coreX + half
+                && z >= coreZ - half && z <= coreZ + half;
+        return !insideFootprint;
+    }
+
     public boolean overlapsCube(String worldName, int cx, int cy, int cz, int otherSize) {
         if (!worldName.equals(world)) return false;
         int half = getHalf();
