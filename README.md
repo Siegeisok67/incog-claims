@@ -56,23 +56,8 @@ actually runs, since "26.2" is a Purpur build number, not an MC/API version).
 - **Trusted members:** `/iclaims trust <player>` / `/iclaims untrust <player>`
   let others build/break freely inside your claim, regardless of playstyle.
 - **Switching sides:** `/iclaims switch` toggles PVP/Peaceful with a 3-day
-  (configurable) cooldown. `/iclaims select` opens the same playstyle-choice
-  menu shown on first join and can be used again later to change your choice -
-  it shares the exact same cooldown as `/iclaims switch` (you can't dodge the
-  cooldown by using one command instead of the other), and picking a type
-  keeps your account type and every claim you own in sync. OPs can clear a
-  connected player's cooldown with `/iclaims admin removecooldown <player>`.
-- **Claim borders:** `/iclaims showclaim` toggles a particle wireframe that
-  only appears around the one claim you're currently standing inside (and
-  only if you're a member of it) - it doesn't render every claim you own from
-  a distance. Particle spacing is configurable (`border-particle-spacing`,
-  default 1) for a denser, easier-to-see outline.
-- **Obsidian buffer zone:** obsidian can't be placed within
-  `obsidian-buffer-radius` blocks (default 4, so a 9-block-wide band) of any
-  claim's border, even outside the claim itself. This stops players from
-  walling a claim in with an obsidian shell placed just outside the border,
-  which would otherwise dodge the plugin's normal raid rules since that
-  obsidian wouldn't belong to any claim.
+  (configurable) cooldown. OPs can clear a connected player's cooldown with
+  `/iclaims admin removecooldown <player>`.
 - **OP-only admin commands:** all `/iclaims admin ...` and `/iclaims reload`
   commands require the sender to actually be a server operator (`isOp()`),
   not just hold a permission node. Regular claim protection bypass (breaking
@@ -91,8 +76,6 @@ Base command works as both `/iclaims` and `/incogclaims`.
 | `/iclaims trust <player>` | Trust a player in your claim |
 | `/iclaims untrust <player>` | Remove trust |
 | `/iclaims switch` | Switch PVP/Peaceful (3-day cooldown) |
-| `/iclaims select` | Open the playstyle menu - works for your first choice AND to change it later (same cooldown as `/iclaims switch`) |
-| `/iclaims showclaim` | Toggle a particle border around the claim you're currently standing in |
 | `/iclaims info` | View your claim/type/claim-block info |
 | `/iclaims delete` | Delete your own claim |
 | `/iclaims admin delete <player>` | (OP only) delete any player's claim |
@@ -112,10 +95,8 @@ Base command works as both `/iclaims` and `/incogclaims`.
 
 See `src/main/resources/config.yml` - claim core material, claim sizes/costs,
 earn interval/amount, max claim blocks cap, switch cooldown, TNT raid toggle,
-whether the TNT attacker must themselves be PVP to raid, OP bypass toggle, the
-Claim Breaker loot chance, the obsidian border-buffer radius
-(`obsidian-buffer-radius`), and the `/iclaims showclaim` particle spacing
-(`border-particle-spacing`).
+whether the TNT attacker must themselves be PVP to raid, OP bypass toggle, and
+the Claim Breaker loot chance.
 
 ## Notes / things you may want to extend
 

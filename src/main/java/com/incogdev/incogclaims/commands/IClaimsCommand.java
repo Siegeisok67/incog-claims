@@ -76,7 +76,7 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
         Msg.sendRaw(sender, "&7/iclaims info &f- view your claim's info");
         Msg.sendRaw(sender, "&7/iclaims delete &f- delete your claim");
         Msg.sendRaw(sender, "&7/iclaims showclaim &f- toggle a particle border around your claim(s)");
-        Msg.sendRaw(sender, "&7/iclaims select &f- open the Peaceful/PVP playstyle menu (first-time choice only)");
+        Msg.sendRaw(sender, "&7/iclaims select &f- open the Peaceful/PVP playstyle menu (also works to change your choice later, same cooldown as /iclaims switch)");
         if (sender.isOp()) {
             Msg.sendRaw(sender, "&c/iclaims admin delete &f- delete the claim you're standing in");
             Msg.sendRaw(sender, "&c/iclaims admin give claimbreaker <player> &f- give the rare pickaxe");
@@ -239,11 +239,25 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
     private void handleSelect(CommandSender sender) {
         if (!(sender instanceof Player player)) { Msg.sendRaw(sender, "&cPlayers only."); return; }
         PlayerData data = plugin.getPlayerDataManager().get(player.getUniqueId());
+
+        // If they've already picked, reopening this menu to change their mind is the same
+        // action as /iclaims switch - so it has to respect the exact same cooldown, or
+        // it'd just be a free way to dodge the switch-cooldown entirely.
         if (data.hasChosenType()) {
-            Msg.send(player, "&cYou've already chosen a playstyle. Use /iclaims switch to change it instead.");
-            return;
+            long remaining = data.getSwitchCooldownRemainingMillis(plugin.getConfigManager().getSwitchCooldownDays());
+            if (remaining > 0) {
+                sendCooldownMessage(player, remaining);
+                return;
+            }
         }
+
         TypeSelectGUI.open(player);
+    }
+
+    private void sendCooldownMessage(Player player, long remainingMillis) {
+        long days = TimeUnit.MILLISECONDS.toDays(remainingMillis);
+        long hours = TimeUnit.MILLISECONDS.toHours(remainingMillis) % 24;
+        Msg.send(player, "&cYou can change your playstyle again in " + days + "d " + hours + "h.");
     }
 
     private void handleTrust(CommandSender sender, String[] args, boolean trust) {
@@ -292,31 +306,14 @@ public class IClaimsCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        long cooldownMillis = TimeUnit.DAYS.toMillis(plugin.getConfigManager().getSwitchCooldownDays());
-        long since = System.currentTimeMillis() - data.getLastSwitchTimestamp();
-        if (data.getLastSwitchTimestamp() != 0 && since < cooldownMillis) {
-            long remaining = cooldownMillis - since;
-            long days = TimeUnit.MILLISECONDS.toDays(remaining);
-            long hours = TimeUnit.MILLISECONDS.toHours(remaining) % 24;
-            Msg.send(player, "&cYou can switch again in " + days + "d " + hours + "h.");
+        long remaining = data.getSwitchCooldownRemainingMillis(plugin.getConfigManager().getSwitchCooldownDays());
+        if (remaining > 0) {
+            sendCooldownMessage(player, remaining);
             return;
         }
 
         ClaimType newType = data.getType() == ClaimType.PVP ? ClaimType.PEACEFUL : ClaimType.PVP;
-        data.setType(newType);
-        data.setLastSwitchTimestamp(System.currentTimeMillis());
-
-        // Your PVP/Peaceful flag is account-wide, so it applies to every claim you own
-        // (primary + any purchased extras), not just the one you happened to make first.
-        for (Claim claim : plugin.getClaimManager().getClaimsOwnedBy(player.getUniqueId())) {
-            claim.setType(newType);
-            // Keep the "peaceful can only trust peaceful / PVP can only trust PVP" rule
-            // consistent - drop any trusted player who no longer matches after the switch.
-            claim.getTrusted().removeIf(uuid -> {
-                ClaimType trustedType = plugin.getPlayerDataManager().get(uuid).getType();
-                return trustedType != newType;
-            });
-        }
+        plugin.applyTypeSelection(player, newType);
 
         Msg.send(player, "&aYou are now &f" + newType.name() + "&a.");
         if (newType == ClaimType.PVP) {

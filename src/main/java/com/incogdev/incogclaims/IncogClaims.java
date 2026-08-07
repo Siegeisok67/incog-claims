@@ -2,7 +2,10 @@ package com.incogdev.incogclaims;
 
 import com.incogdev.incogclaims.commands.IClaimsCommand;
 import com.incogdev.incogclaims.config.ConfigManager;
+import com.incogdev.incogclaims.data.Claim;
 import com.incogdev.incogclaims.data.ClaimManager;
+import com.incogdev.incogclaims.data.ClaimType;
+import com.incogdev.incogclaims.data.PlayerData;
 import com.incogdev.incogclaims.data.PlayerDataManager;
 import com.incogdev.incogclaims.data.StorageManager;
 import com.incogdev.incogclaims.listeners.EnchantListener;
@@ -10,6 +13,7 @@ import com.incogdev.incogclaims.listeners.GUIListener;
 import com.incogdev.incogclaims.listeners.JoinListener;
 import com.incogdev.incogclaims.listeners.ProtectionListener;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class IncogClaims extends JavaPlugin {
@@ -90,6 +94,43 @@ public class IncogClaims extends JavaPlugin {
         // Runs on the main thread (particle spawning is not thread-safe) every second -
         // frequent enough to look like a steady outline without spamming packets.
         getServer().getScheduler().runTaskTimer(this, protectionListener::tickBorders, 20L, 20L);
+    }
+
+    /**
+     * Single place that commits a PVP/Peaceful selection for a player - whether it's
+     * their very first choice (on-join GUI, or /iclaims select before they've ever
+     * picked) or a change to an existing choice (/iclaims switch, or /iclaims select
+     * reopened after they've already picked). Keeps PlayerData's type and every claim
+     * that player owns perfectly in sync, so a claim can never silently keep being
+     * "Peaceful" while its owner's account has flipped to "PVP" (or vice versa) - that
+     * mismatch is exactly the kind of desync that would produce very confusing
+     * protection/trust behavior later.
+     *
+     * Callers are responsible for the cooldown check (via
+     * PlayerData#getSwitchCooldownRemainingMillis) BEFORE calling this for anyone who has
+     * already chosen a type - this method itself always applies the change unconditionally.
+     */
+    public void applyTypeSelection(Player player, ClaimType newType) {
+        PlayerData data = playerDataManager.get(player.getUniqueId());
+        boolean firstChoice = !data.hasChosenType();
+
+        data.setType(newType);
+        data.setHasChosenType(true);
+
+        if (!firstChoice) {
+            data.setLastSwitchTimestamp(System.currentTimeMillis());
+            // Your PVP/Peaceful flag is account-wide, so it applies to every claim you
+            // own (primary + any purchased extras), not just whichever one exists first.
+            for (Claim claim : claimManager.getClaimsOwnedBy(player.getUniqueId())) {
+                claim.setType(newType);
+                // Keep the "peaceful can only trust peaceful / PVP can only trust PVP"
+                // rule consistent - drop any trusted player who no longer matches.
+                claim.getTrusted().removeIf(uuid -> {
+                    ClaimType trustedType = playerDataManager.get(uuid).getType();
+                    return trustedType != newType;
+                });
+            }
+        }
     }
 
     public static IncogClaims getInstance() { return instance; }

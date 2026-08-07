@@ -20,13 +20,21 @@ public class JoinListener implements Listener {
         var player = event.getPlayer();
         PlayerData data = plugin.getPlayerDataManager().get(player.getUniqueId());
 
-        if (!data.hasChosenType()) {
-            // slight delay so the GUI opens cleanly after the player fully loads in
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                if (player.isOnline()) {
-                    TypeSelectGUI.open(player);
-                }
-            }, 20L);
-        }
+        if (data.hasChosenType()) return;
+
+        // Slight delay so the GUI opens cleanly after the player fully loads in. The
+        // hasChosenType() check is deliberately re-done INSIDE the scheduled task, not
+        // just before scheduling it - if the player manually runs /iclaims select and
+        // picks a type during that ~1-second window, this must not fire and reopen the
+        // picker on top of their already-made choice. It would otherwise get treated as
+        // a playstyle *switch* and needlessly burn their switch cooldown the instant
+        // they join, which is exactly the kind of join-delay/select desync to avoid.
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (!player.isOnline()) return;
+            PlayerData current = plugin.getPlayerDataManager().get(player.getUniqueId());
+            if (!current.hasChosenType()) {
+                TypeSelectGUI.open(player);
+            }
+        }, 20L);
     }
 }

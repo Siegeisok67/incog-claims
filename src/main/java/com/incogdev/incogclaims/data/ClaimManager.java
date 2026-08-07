@@ -103,6 +103,35 @@ public class ClaimManager {
         return null;
     }
 
+    /**
+     * Finds a claim (if any) whose horizontal "keep clear" buffer (see
+     * Claim#isInHorizontalBuffer) contains this location. Used to block obsidian
+     * placement just outside a claim's border. Searches every chunk within range of the
+     * padding, not just the location's own chunk, so it still catches claims whose real
+     * border - not just their indexed chunk - is within `padding` blocks of loc.
+     */
+    public Claim getClaimInBuffer(Location loc, int padding) {
+        if (loc == null || loc.getWorld() == null || padding <= 0) return null;
+
+        int chunkRadius = (padding >> 4) + 1;
+        int baseCx = loc.getBlockX() >> 4, baseCz = loc.getBlockZ() >> 4;
+        String worldName = loc.getWorld().getName();
+
+        Set<UUID> candidates = new HashSet<>();
+        for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
+            for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
+                Set<UUID> inChunk = chunkIndex.get(chunkKey(worldName, baseCx + dx, baseCz + dz));
+                if (inChunk != null) candidates.addAll(inChunk);
+            }
+        }
+
+        for (UUID id : candidates) {
+            Claim c = claimsById.get(id);
+            if (c != null && c.isInHorizontalBuffer(loc, padding)) return c;
+        }
+        return null;
+    }
+
     /** Checks whether a proposed new/resized cube would overlap any OTHER existing claim. */
     public boolean wouldOverlap(Claim ignore, String world, int cx, int cy, int cz, int size) {
         for (Claim c : claimsById.values()) {

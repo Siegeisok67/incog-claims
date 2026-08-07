@@ -19,6 +19,7 @@ public class ConfigManager {
     private int switchCooldownDays;
     private int coreCooldownMinutes;
     private int maxObsidianPerClaim;
+    private int obsidianBufferRadius;
     private int maxBedrockPerClaim;
     private int extraClaimCostBlocks;
     private int extraClaimCostEndCrystals;
@@ -28,6 +29,7 @@ public class ConfigManager {
     private double claimbreakerLootChance;
     private boolean claimbreakerCraftable;
     private int maxClaimBlocks;
+    private int borderParticleSpacing;
 
     public ConfigManager(IncogClaims plugin) {
         this.plugin = plugin;
@@ -63,6 +65,7 @@ public class ConfigManager {
         switchCooldownDays = cfg.getInt("switch-cooldown-days", 3);
         coreCooldownMinutes = cfg.getInt("core-cooldown-minutes", 30);
         maxObsidianPerClaim = cfg.getInt("max-obsidian-per-claim", 120);
+        obsidianBufferRadius = cfg.getInt("obsidian-buffer-radius", 4);
         maxBedrockPerClaim = cfg.getInt("max-bedrock-per-claim", 0);
         extraClaimCostBlocks = cfg.getInt("extra-claim-cost-blocks", 500);
         extraClaimCostEndCrystals = cfg.getInt("extra-claim-cost-end-crystals", 5);
@@ -72,6 +75,7 @@ public class ConfigManager {
         claimbreakerLootChance = cfg.getDouble("claimbreaker-loot-chance", 0.0015);
         claimbreakerCraftable = cfg.getBoolean("claimbreaker-craftable", true);
         maxClaimBlocks = cfg.getInt("max-claim-blocks", 5000);
+        borderParticleSpacing = Math.max(1, cfg.getInt("border-particle-spacing", 1));
     }
 
     public Material getClaimCoreMaterial() { return claimCoreMaterial; }
@@ -82,6 +86,7 @@ public class ConfigManager {
     public int getSwitchCooldownDays() { return switchCooldownDays; }
     public int getCoreCooldownMinutes() { return coreCooldownMinutes; }
     public int getMaxObsidianPerClaim() { return maxObsidianPerClaim; }
+    public int getObsidianBufferRadius() { return obsidianBufferRadius; }
     public int getMaxBedrockPerClaim() { return maxBedrockPerClaim; }
     public int getExtraClaimCostBlocks() { return extraClaimCostBlocks; }
     public int getExtraClaimCostEndCrystals() { return extraClaimCostEndCrystals; }
@@ -91,6 +96,7 @@ public class ConfigManager {
     public double getClaimbreakerLootChance() { return claimbreakerLootChance; }
     public boolean isClaimbreakerCraftable() { return claimbreakerCraftable; }
     public int getMaxClaimBlocks() { return maxClaimBlocks; }
+    public int getBorderParticleSpacing() { return borderParticleSpacing; }
 
     public String getMessage(String path) {
         return plugin.getConfig().getString("messages." + path, "");

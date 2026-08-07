@@ -35,6 +35,21 @@ public class PlayerData {
     public long getLastSwitchTimestamp() { return lastSwitchTimestamp; }
     public void setLastSwitchTimestamp(long t) { this.lastSwitchTimestamp = t; }
 
+    /**
+     * Milliseconds remaining before this player may switch PVP/Peaceful again, given the
+     * configured cooldown - 0 (or negative) means the cooldown is over and a switch is
+     * allowed right now. Single source of truth for this check so /iclaims switch,
+     * /iclaims select (when reopened after a choice was already made), and the GUI click
+     * handler all agree on the exact same remaining time instead of computing it
+     * separately and risking drift between them.
+     */
+    public long getSwitchCooldownRemainingMillis(int cooldownDays) {
+        if (lastSwitchTimestamp == 0L) return 0L;
+        long cooldownMillis = java.util.concurrent.TimeUnit.DAYS.toMillis(cooldownDays);
+        long elapsed = System.currentTimeMillis() - lastSwitchTimestamp;
+        return cooldownMillis - elapsed;
+    }
+
     public long getLastCoreTimestamp() { return lastCoreTimestamp; }
     public void setLastCoreTimestamp(long t) { this.lastCoreTimestamp = t; }
 

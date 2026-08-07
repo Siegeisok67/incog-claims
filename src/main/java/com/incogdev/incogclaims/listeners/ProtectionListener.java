@@ -54,7 +54,8 @@ public class ProtectionListener implements Listener {
     private volatile boolean loggedMoveError = false;
 
     // Players who've toggled /iclaims showclaim on - they see a particle border around
-    // every claim they own, redrawn once a second by tickBorders().
+    // whichever one of their claims they're currently standing in, redrawn once a second
+    // by tickBorders().
     private final Set<UUID> showingBorder = ConcurrentHashMap.newKeySet();
 
     public ProtectionListener(IncogClaims plugin) {
@@ -70,25 +71,23 @@ public class ProtectionListener implements Listener {
 
     /**
      * Redraws a particle wireframe (green "happy villager" sparkles, same as trading with
-     * villagers) around every claim each toggled-on player owns. Only draws claims in the
-     * player's current world within a reasonable distance, to avoid wasted work for claims
-     * they're nowhere near. Particles are sent only to that one player.
+     * villagers) around ONLY the claim the toggled-on player is currently standing inside
+     * (and only if it's a claim they're actually a member of - owner or trusted). If
+     * they're not standing in one of their own claims right now, nothing is drawn. This
+     * intentionally does not scan/render every claim they own from a distance anymore -
+     * it's a live "which claim am I in, and where's its edge" indicator, not a claim map.
      */
     public void tickBorders() {
         if (showingBorder.isEmpty()) return;
-        final int maxRenderDistance = 150;
 
         for (UUID uuid : showingBorder) {
             Player player = plugin.getServer().getPlayer(uuid);
             if (player == null || !player.isOnline()) continue;
 
-            for (Claim claim : plugin.getClaimManager().getClaimsOwnedBy(uuid)) {
-                if (!claim.getWorldName().equals(player.getWorld().getName())) continue;
-                Location core = claim.getCoreLocation();
-                if (core == null) continue;
-                if (core.distance(player.getLocation()) > maxRenderDistance + claim.getHalf()) continue;
-                drawClaimBorder(player, claim);
-            }
+            Claim claim = plugin.getClaimManager().getClaimAt(player.getLocation());
+            if (claim == null || !claim.isMember(uuid)) continue;
+
+            drawClaimBorder(player, claim);
         }
     }
 
@@ -98,7 +97,10 @@ public class ProtectionListener implements Listener {
         int minX = claim.getCoreX() - half, maxX = claim.getCoreX() + half;
         int minY = claim.getCoreY() - half, maxY = claim.getCoreY() + half;
         int minZ = claim.getCoreZ() - half, maxZ = claim.getCoreZ() + half;
-        int step = 2; // particle spacing - keeps big claims from spamming thousands of particles
+        // Particle spacing along each edge - lower is denser/easier to see. Configurable
+        // since only ever rendering ONE claim at a time (see above) gives us headroom to
+        // default this a lot denser than before without spamming packets.
+        int step = plugin.getConfigManager().getBorderParticleSpacing();
 
         for (int y = minY; y <= maxY; y += step) {
             spawnBorderParticle(player, world, minX, y, minZ);
@@ -246,10 +248,25 @@ public class ProtectionListener implements Listener {
 
         if (bypasses(player)) return;
 
-        Claim claim = plugin.getClaimManager().getClaimAt(event.getBlockPlaced().getLocation());
-        if (claim == null) return;
-
+        Location placedLoc = event.getBlockPlaced().getLocation();
         Material placedType = event.getBlockPlaced().getType();
+        Claim claim = plugin.getClaimManager().getClaimAt(placedLoc);
+
+        if (claim == null) {
+            // Not inside any claim - but obsidian still can't go in the buffer band
+            // immediately outside a claim's border (see ClaimManager#getClaimInBuffer),
+            // whether it's your own claim or someone else's. This is what stops the
+            // "obsidian-box the outside of my claim so it can never be raided" trick.
+            if (placedType == Material.OBSIDIAN) {
+                int buffer = plugin.getConfigManager().getObsidianBufferRadius();
+                if (buffer > 0 && plugin.getClaimManager().getClaimInBuffer(placedLoc, buffer) != null) {
+                    event.setCancelled(true);
+                    Msg.send(player, "&cYou can't place obsidian this close to a claim border.");
+                    return;
+                }
+            }
+            return;
+        }
 
         if (claim.isMember(player.getUniqueId())) {
             if (placedType == Material.OBSIDIAN) {

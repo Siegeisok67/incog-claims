@@ -13,6 +13,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 
+import java.util.concurrent.TimeUnit;
+
 public class GUIListener implements Listener {
 
     private final IncogClaims plugin;
@@ -31,17 +33,41 @@ public class GUIListener implements Listener {
             int slot = event.getRawSlot();
             PlayerData data = plugin.getPlayerDataManager().get(player.getUniqueId());
 
-            if (slot == TypeSelectGUI.PVP_SLOT) {
-                data.setType(ClaimType.PVP);
-                data.setHasChosenType(true);
-                player.closeInventory();
-                Msg.send(player, plugin.getConfigManager().getMessage("pvp-warning"));
-            } else if (slot == TypeSelectGUI.PEACEFUL_SLOT) {
-                data.setType(ClaimType.PEACEFUL);
-                data.setHasChosenType(true);
-                player.closeInventory();
-                Msg.send(player, plugin.getConfigManager().getMessage("peaceful-info"));
+            ClaimType chosen = slot == TypeSelectGUI.PVP_SLOT ? ClaimType.PVP
+                    : slot == TypeSelectGUI.PEACEFUL_SLOT ? ClaimType.PEACEFUL
+                    : null;
+            if (chosen == null) return; // clicked somewhere in the GUI that isn't a choice
+
+            boolean firstChoice = !data.hasChosenType();
+
+            if (!firstChoice) {
+                // This menu can now be reopened via /iclaims select even after a choice
+                // was already made, which makes picking here the same action as
+                // /iclaims switch - so re-check the cooldown right here at click-time,
+                // not just when the menu was opened. Re-checking live avoids a desync if
+                // their cooldown state changed while the menu sat open (an admin clearing
+                // it, or - the case that actually bit this plugin - the on-join delayed
+                // task reopening this same GUI on top of a choice made moments earlier).
+                long remaining = data.getSwitchCooldownRemainingMillis(plugin.getConfigManager().getSwitchCooldownDays());
+                if (remaining > 0) {
+                    long days = TimeUnit.MILLISECONDS.toDays(remaining);
+                    long hours = TimeUnit.MILLISECONDS.toHours(remaining) % 24;
+                    Msg.send(player, "&cYou can change your playstyle again in " + days + "d " + hours + "h.");
+                    player.closeInventory();
+                    return;
+                }
+                if (chosen == data.getType()) {
+                    Msg.send(player, "&eYou're already " + chosen.name() + ".");
+                    player.closeInventory();
+                    return;
+                }
             }
+
+            plugin.applyTypeSelection(player, chosen);
+            player.closeInventory();
+            Msg.send(player, chosen == ClaimType.PVP
+                    ? plugin.getConfigManager().getMessage("pvp-warning")
+                    : plugin.getConfigManager().getMessage("peaceful-info"));
             return;
         }
 
